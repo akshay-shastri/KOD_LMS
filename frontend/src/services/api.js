@@ -1,14 +1,13 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
-  withCredentials: true // IMPORTANT for refresh cookie
+  baseURL: import.meta.env.VITE_API_URL,
+  withCredentials: true
 });
 
 let isRefreshing = false;
 let failedQueue = [];
 
-// Process queued requests after refresh
 const processQueue = (error, token = null) => {
   failedQueue.forEach(prom => {
     if (error) {
@@ -21,10 +20,6 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// -----------------------------
-// REQUEST INTERCEPTOR
-// Attach Access Token
-// -----------------------------
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -38,23 +33,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// -----------------------------
-// RESPONSE INTERCEPTOR
-// Auto Refresh Logic
-// -----------------------------
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If access token expired
     if (
       error.response &&
       error.response.status === 401 &&
       !originalRequest._retry
     ) {
       if (isRefreshing) {
-        // Queue requests while refreshing
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
@@ -69,8 +58,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
         const response = await axios.post(
-          "http://localhost:5000/api/auth/refresh-token",
+          `${baseURL}/auth/refresh-token`,
           {},
           { withCredentials: true }
         );
